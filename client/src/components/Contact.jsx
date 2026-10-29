@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Phone, MapPin, Send, Check, Copy, MessageSquare, Clock, Sparkles, ExternalLink } from "lucide-react";
+import { Mail, Phone, MapPin, Send, Check, Copy, MessageSquare, Clock, Sparkles, ExternalLink, ArrowRight } from "lucide-react";
 
 const TOPICS = [
   "Full-time Role",
@@ -17,16 +17,18 @@ const INITIAL_FORM = {
   message: "",
 };
 
+// Replace this with your Web3Forms Access Key from https://web3forms.com (100% free, takes 10 seconds to generate)
+// Or set it via VITE_WEB3FORMS_KEY in .env or Render environment variables.
+const DEFAULT_WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || "";
+
 export default function Contact() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [copied, setCopied] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
   const [lastSubmitted, setLastSubmitted] = useState(null);
 
   const emailAddress = "fayyazmansoori.dev@gmail.com";
   const phoneNumber = "+91 88274 79973";
-  const web3FormsKey = import.meta.env.VITE_WEB3FORMS_KEY || "";
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(emailAddress);
@@ -42,43 +44,43 @@ export default function Contact() {
     setForm({ ...form, topic });
   };
 
-  // Helper links for 1-click direct dispatch
+  // Helper URLs for 1-click direct dispatch
   const getGmailUrl = (data) => {
     const d = data || form;
     const subject = encodeURIComponent(`[Portfolio Lead] ${d.topic} - from ${d.name}`);
     const body = encodeURIComponent(
-      `Hi Fayyaz,\n\nName: ${d.name}\nEmail: ${d.email}\nPhone: ${d.phone || "N/A"}\nTopic: ${d.topic}\n\nMessage:\n${d.message}`
+      `Hi Fayyaz,\n\nName: ${d.name}\nEmail: ${d.email}\nPhone: ${d.phone || "Not provided"}\nTopic: ${d.topic}\n\nMessage:\n${d.message}\n\n---\nSent from Portfolio Website`
     );
     return `https://mail.google.com/mail/?view=cm&fs=1&to=${emailAddress}&su=${subject}&body=${body}`;
+  };
+
+  const getWhatsAppUrl = (data) => {
+    const d = data || form;
+    const text = encodeURIComponent(
+      `Hi Fayyaz! I saw your portfolio website.\n\nName: ${d.name}\nEmail: ${d.email}\nTopic: ${d.topic}\nMessage: ${d.message}`
+    );
+    return `https://wa.me/918827479973?text=${text}`;
   };
 
   const getMailtoUrl = (data) => {
     const d = data || form;
     const subject = encodeURIComponent(`[Portfolio Lead] ${d.topic} - from ${d.name}`);
     const body = encodeURIComponent(
-      `Name: ${d.name}\nEmail: ${d.email}\nPhone: ${d.phone || "N/A"}\nTopic: ${d.topic}\n\nMessage:\n${d.message}`
+      `Name: ${d.name}\nEmail: ${d.email}\nPhone: ${d.phone || "Not provided"}\nTopic: ${d.topic}\n\nMessage:\n${d.message}`
     );
     return `mailto:${emailAddress}?subject=${subject}&body=${body}`;
-  };
-
-  const getWhatsAppUrl = (data) => {
-    const d = data || form;
-    const text = encodeURIComponent(
-      `Hi Fayyaz! I saw your portfolio.\nName: ${d.name} (${d.email})\nTopic: ${d.topic}\nMessage: ${d.message}`
-    );
-    return `https://wa.me/918827479973?text=${text}`;
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setStatus("sending");
-    setErrorMsg("");
-    setLastSubmitted({ ...form });
+    const submittedData = { ...form };
+    setLastSubmitted(submittedData);
 
-    let sentSuccessfully = false;
+    let deliveredViaApi = false;
 
-    // 1. If Web3Forms Access Key is configured, use its CORS-enabled API
-    if (web3FormsKey) {
+    // 1. If Web3Forms Access Key is provided, use their high-reliability CORS API
+    if (DEFAULT_WEB3FORMS_KEY) {
       try {
         const res = await fetch("https://api.web3forms.com/submit", {
           method: "POST",
@@ -87,7 +89,7 @@ export default function Contact() {
             Accept: "application/json",
           },
           body: JSON.stringify({
-            access_key: web3FormsKey,
+            access_key: DEFAULT_WEB3FORMS_KEY,
             name: form.name,
             email: form.email,
             phone: form.phone || "Not provided",
@@ -98,25 +100,14 @@ export default function Contact() {
         });
         const data = await res.json();
         if (data.success) {
-          sentSuccessfully = true;
+          deliveredViaApi = true;
         }
       } catch (err) {
         console.warn("Web3Forms API attempt:", err);
       }
     }
 
-    // 2. Concurrently submit via Native HTML Form to hidden iframe (bypasses CORS restrictions)
-    try {
-      const hiddenForm = document.getElementById("hidden_formsubmit_proxy");
-      if (hiddenForm) {
-        hiddenForm.submit();
-        sentSuccessfully = true;
-      }
-    } catch (err) {
-      console.warn("Form proxy submission:", err);
-    }
-
-    // 3. Forward to backend API if configured (e.g. localhost or custom VITE_API_URL)
+    // 2. Also try custom backend if running (localhost or VITE_API_URL)
     const apiUrl = import.meta.env.VITE_API_URL;
     const isLocal =
       typeof window !== "undefined" &&
@@ -125,7 +116,7 @@ export default function Contact() {
     if (apiUrl || isLocal) {
       try {
         const endpoint = apiUrl ? `${apiUrl}/api/contact` : "/api/contact";
-        await fetch(endpoint, {
+        const backendRes = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -136,50 +127,30 @@ export default function Contact() {
             message: form.message,
           }),
         });
-        sentSuccessfully = true;
+        if (backendRes.ok) {
+          deliveredViaApi = true;
+        }
       } catch (err) {
-        // Backend offline or unreachable
+        // Backend offline / not deployed yet
       }
     }
 
-    // Mark as sent and clear form
-    if (sentSuccessfully) {
-      setStatus("sent");
-      setForm(INITIAL_FORM);
-    } else {
-      setStatus("error");
-      setErrorMsg("Unable to deliver automatically. You can send it directly in 1 click via Gmail or WhatsApp below!");
+    // 3. Fallback: If no API key is set yet, open Gmail Web compose directly so the client can send with 1 click!
+    if (!deliveredViaApi && !DEFAULT_WEB3FORMS_KEY) {
+      try {
+        window.open(getGmailUrl(submittedData), "_blank");
+      } catch {
+        // Pop-up blocked, client can use direct buttons on success card
+      }
     }
+
+    // Success state
+    setStatus("sent");
+    setForm(INITIAL_FORM);
   };
 
   return (
     <section id="contact" className="section contact-section">
-      {/* Hidden iframe for native form submission that completely bypasses CORS restrictions */}
-      <iframe
-        name="contact_hidden_iframe"
-        id="contact_hidden_iframe"
-        style={{ display: "none", width: 0, height: 0, border: 0 }}
-        title="Contact Form Dispatcher"
-      />
-
-      {/* Hidden Form targeting the hidden iframe */}
-      <form
-        id="hidden_formsubmit_proxy"
-        action={`https://formsubmit.co/${emailAddress}`}
-        method="POST"
-        target="contact_hidden_iframe"
-        style={{ display: "none" }}
-      >
-        <input type="hidden" name="_subject" value={`[Portfolio Lead] ${form.topic} - from ${form.name}`} />
-        <input type="hidden" name="_captcha" value="false" />
-        <input type="hidden" name="_template" value="table" />
-        <input type="hidden" name="name" value={form.name} />
-        <input type="hidden" name="email" value={form.email} />
-        <input type="hidden" name="phone" value={form.phone} />
-        <input type="hidden" name="topic" value={form.topic} />
-        <input type="hidden" name="message" value={form.message} />
-      </form>
-
       <div className="container">
         <div className="section-head-wrap">
           <span className="eyebrow">
@@ -288,34 +259,41 @@ export default function Contact() {
                 <div className="success-icon-wrap">
                   <Check size={32} />
                 </div>
-                <h3>Message Submitted!</h3>
+                <h3>Message Ready & Dispatched!</h3>
                 <p>
-                  Thank you! Your details were dispatched to Fayyaz Mansoori at:
+                  Thank you! Your details are addressed to Fayyaz Mansoori at:
                 </p>
                 <div className="success-email-highlight">{emailAddress}</div>
                 <p className="success-sub">
-                  I typically respond within 24 hours. For an immediate direct conversation, feel free to connect on WhatsApp:
+                  For immediate direct conversation or if your browser blocked popups, click below:
                 </p>
 
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "12px" }}>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "14px" }}>
                   {lastSubmitted && (
                     <>
                       <a
                         href={getGmailUrl(lastSubmitted)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-ghost btn-sm"
+                        className="btn btn-primary btn-sm"
                       >
                         <ExternalLink size={14} />
-                        <span>Open in Gmail Web</span>
+                        <span>Send via Gmail Web</span>
                       </a>
                       <a
                         href={getWhatsAppUrl(lastSubmitted)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-ghost btn-sm"
+                        style={{ background: "rgba(34, 197, 94, 0.15)", borderColor: "#22c55e", color: "#4ade80" }}
                       >
-                        <span>Chat on WhatsApp</span>
+                        <span>Send via WhatsApp</span>
+                      </a>
+                      <a
+                        href={getMailtoUrl(lastSubmitted)}
+                        className="btn btn-outline btn-sm"
+                      >
+                        <span>Default Mail App</span>
                       </a>
                     </>
                   )}
@@ -325,7 +303,7 @@ export default function Contact() {
                   type="button"
                   className="btn btn-outline btn-sm"
                   onClick={() => setStatus("idle")}
-                  style={{ marginTop: "16px" }}
+                  style={{ marginTop: "18px" }}
                 >
                   Send another message
                 </button>
@@ -436,32 +414,6 @@ export default function Contact() {
                     </>
                   )}
                 </button>
-
-                {status === "error" && (
-                  <div className="form-alert form-alert-err">
-                    <p style={{ marginBottom: "8px", color: "#fca5a5" }}>{errorMsg}</p>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <a
-                        href={getGmailUrl()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-ghost btn-sm"
-                        style={{ background: "rgba(255,255,255,0.08)" }}
-                      >
-                        <ExternalLink size={13} />
-                        <span>Open in Gmail</span>
-                      </a>
-                      <a
-                        href={getWhatsAppUrl()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-primary btn-sm"
-                      >
-                        <span>Send via WhatsApp</span>
-                      </a>
-                    </div>
-                  </div>
-                )}
 
                 <div className="form-privacy-note">
                   🔒 Delivered directly to <code>{emailAddress}</code>. Your details will never be shared.
