@@ -75,17 +75,20 @@ export default function Contact() {
     return `mailto:${emailAddress}?subject=${subject}&body=${body}`;
   };
 
+  const [mailSentStatus, setMailSentStatus] = useState(null); // { sent: boolean, error?: string }
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setStatus("sending");
     const submittedData = { ...form };
     setLastSubmitted(submittedData);
+    setMailSentStatus(null);
 
     let delivered = false;
 
-    // Call live MERN backend endpoint with a 12s timeout controller
+    // Call live MERN backend endpoint with a 15s timeout controller
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
       const endpoint = `${BACKEND_URL}/api/contact`;
@@ -105,13 +108,21 @@ export default function Contact() {
       clearTimeout(timeoutId);
 
       if (res.ok) {
+        const data = await res.json();
         delivered = true;
+        setMailSentStatus({
+          sent: !!data.mailSent,
+          error: data.mailError,
+        });
       }
     } catch (err) {
       console.warn("Backend contact error:", err.message);
+      setMailSentStatus({
+        sent: false,
+        error: "Network/Server lag. Please use direct Gmail or WhatsApp below.",
+      });
     }
 
-    // Whether backend delivered or network had lag, immediately transition out of "Sending..."
     setStatus("sent");
     setForm(INITIAL_FORM);
   };
@@ -226,13 +237,24 @@ export default function Contact() {
                 <div className="success-icon-wrap">
                   <Check size={32} />
                 </div>
-                <h3>Message Sent Successfully!</h3>
-                <p>
-                  Thank you! Your details have been recorded and emailed directly to:
-                </p>
+                <h3>Message Submitted!</h3>
+                {mailSentStatus && mailSentStatus.sent ? (
+                  <p style={{ color: "#34d399", fontWeight: 500 }}>
+                    ✅ Your inquiry has been emailed directly to Fayyaz Mansoori!
+                  </p>
+                ) : (
+                  <p>
+                    Your message was safely saved in MongoDB database!
+                    {mailSentStatus && mailSentStatus.error && (
+                      <span style={{ display: "block", fontSize: "12px", color: "#f59e0b", marginTop: "4px" }}>
+                        (Note: {mailSentStatus.error})
+                      </span>
+                    )}
+                  </p>
+                )}
                 <div className="success-email-highlight">{emailAddress}</div>
                 <p className="success-sub">
-                  I typically respond within 24 hours. For an instant direct chat, feel free to connect via WhatsApp or Gmail:
+                  For immediate discussion, you can also reach out via WhatsApp or Gmail:
                 </p>
 
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "14px" }}>

@@ -25,6 +25,21 @@ const createTransporter = () => {
   });
 };
 
+// GET /api/contact/status - diagnostics endpoint to verify Render environment variables
+router.get("/status", (req, res) => {
+  const user = (process.env.EMAIL_USER || process.env.GMAIL_USER || "").trim();
+  const rawPass = process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || "";
+  const pass = rawPass.replace(/\s+/g, "");
+
+  res.json({
+    emailUserConfigured: !!user,
+    emailPassConfigured: !!pass,
+    user: user || "NOT_SET",
+    passLength: pass.length,
+    recipient: process.env.CONTACT_RECIPIENT || "fayyazmansoori.dev@gmail.com",
+  });
+});
+
 // POST /api/contact - save message to DB and send notification email to Fayyaz
 router.post("/", async (req, res) => {
   const { name, email, subject, phone, message } = req.body || {};
@@ -43,14 +58,16 @@ router.post("/", async (req, res) => {
       message,
     });
 
-    // 2. Immediately respond to client with 201 Created so the UI stops buffering instantly!
-    res.status(201).json({ ok: true, id: saved._id });
-
-    // 3. Send email notification in the background (non-blocking)
+    // 2. Prepare email delivery
     const recipient = process.env.CONTACT_RECIPIENT || "fayyazmansoori.dev@gmail.com";
     const transporter = createTransporter();
+    let mailSent = false;
+    let mailError = null;
 
-    if (transporter) {
+    if (!transporter) {
+      mailError = "EMAIL_USER or EMAIL_PASS environment variable is not set in Render Dashboard.";
+      console.warn("[Contact] " + mailError);
+    } else {
       const mailSubject = `[Portfolio Lead] ${subject || "New Message"} - from ${name}`;
       const mailHtml = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #1e293b;">
@@ -104,23 +121,29 @@ router.post("/", async (req, res) => {
         </div>
       `;
 
-      transporter
-        .sendMail({
+      try {
+        await transporter.sendMail({
           from: `"Portfolio Contact Form" <${process.env.EMAIL_USER || process.env.GMAIL_USER}>`,
           to: recipient,
           replyTo: email,
           subject: mailSubject,
           html: mailHtml,
-        })
-        .then(() => {
-          console.log(`[Contact] Notification email delivered to ${recipient}`);
-        })
-        .catch((mailErr) => {
-          console.error("[Contact] Error delivering email via Nodemailer:", mailErr.message);
         });
-    } else {
-      console.log(`[Contact] Message saved to DB. Note: EMAIL_USER/EMAIL_PASS not set.`);
+        mailSent = true;
+        console.log(`[Contact] Notification email delivered to ${recipient}`);
+      } catch (err) {
+        mailError = err.message;
+        console.error("[Contact] Error delivering email via Nodemailer:", err.message);
+      }
     }
+
+    // 3. Return explicit delivery status so frontend knows whether email was sent
+    res.status(201).json({
+      ok: true,
+      id: saved._id,
+      mailSent,
+      mailError,
+    });
   } catch (err) {
     console.error("[Contact] Error saving message:", err);
     res.status(500).json({ error: "Could not save your message. Try again shortly." });
