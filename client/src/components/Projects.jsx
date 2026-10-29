@@ -15,7 +15,19 @@ export default function Projects() {
   const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
-    fetch("/api/projects")
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const isLocal =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+    // On static deployments (e.g. Render static site) without a separate backend URL,
+    // don't fire a doomed /api/projects request that prints 404 in console.
+    if (!apiUrl && !isLocal) {
+      return;
+    }
+
+    const endpoint = apiUrl ? `${apiUrl}/api/projects` : "/api/projects";
+    fetch(endpoint)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
         if (Array.isArray(data) && data.length) {
@@ -28,7 +40,7 @@ export default function Projects() {
         }
       })
       .catch(() => {
-        /* Backend offline / static build — keep static list */
+        /* Backend offline — keep static list */
       });
   }, []);
 
