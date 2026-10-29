@@ -6,6 +6,13 @@ import Message from "../models/Message.js";
 const router = Router();
 
 // Configure Nodemailer transporter (works on localhost / servers that don't block SMTP)
+const getResendApiKey = () => {
+  if (process.env.RESEND_API_KEY) return process.env.RESEND_API_KEY.trim();
+  if (process.env.Value && process.env.Value.startsWith("re_")) return process.env.Value.trim();
+  if (process.env.Key === "RESEND_API_KEY" && process.env.Value) return process.env.Value.trim();
+  return null;
+};
+
 const createTransporter = () => {
   const user = (process.env.EMAIL_USER || process.env.GMAIL_USER || "").trim();
   const rawPass = process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || "";
@@ -31,7 +38,8 @@ router.get("/status", (req, res) => {
   const user = (process.env.EMAIL_USER || process.env.GMAIL_USER || "").trim();
   const rawPass = process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || "";
   const pass = rawPass.replace(/\s+/g, "");
-  const hasResend = !!process.env.RESEND_API_KEY;
+  const resendApiKey = getResendApiKey();
+  const hasResend = !!resendApiKey;
 
   res.json({
     emailUserConfigured: !!user,
@@ -119,9 +127,10 @@ router.post("/", async (req, res) => {
     let mailError = null;
 
     // METHOD A: Resend API over HTTPS (Port 443 - NEVER blocked by Render Free Tier)
-    if (process.env.RESEND_API_KEY) {
+    const resendKey = getResendApiKey();
+    if (resendKey) {
       try {
-        const resend = new Resend(process.env.RESEND_API_KEY);
+        const resend = new Resend(resendKey);
         const { data, error } = await resend.emails.send({
           from: "Portfolio Contact <onboarding@resend.dev>",
           to: recipient,
