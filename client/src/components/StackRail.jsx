@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
 const LAYERS = [
-  { id: "about", label: "M", title: "MongoDB — the story" },
-  { id: "skills", label: "E", title: "Express — how it's built" },
-  { id: "projects", label: "R", title: "React — what's shipped" },
-  { id: "experience", label: "N", title: "Node — where it runs" },
+  { id: "about", label: "M", title: "MongoDB · About & Foundations" },
+  { id: "skills", label: "E", title: "Express.js · Technical Toolkit" },
+  { id: "projects", label: "R", title: "React.js · Shipped Products" },
+  { id: "experience", label: "N", title: "Node.js · Journey & Experience" },
+  { id: "contact", label: "✉", title: "Connect · Get in Touch" },
 ];
 
 export default function StackRail() {
@@ -18,14 +19,14 @@ export default function StackRail() {
           if (entry.isIntersecting) setActive(entry.target.id);
         });
       },
-      { rootMargin: "-40% 0px -50% 0px" }
+      { rootMargin: "-30% 0px -40% 0px" }
     );
     sections.forEach((s) => observer.observe(s));
     return () => observer.disconnect();
   }, []);
 
   return (
-    <nav className="stack-rail" aria-label="Section progress, mapped to the MERN stack">
+    <nav className="stack-rail" aria-label="Section progress indicator">
       <div className="stack-rail-track">
         {LAYERS.map((layer) => (
           <a
@@ -33,6 +34,7 @@ export default function StackRail() {
             href={`#${layer.id}`}
             className={`stack-node ${active === layer.id ? "is-active" : ""}`}
             title={layer.title}
+            aria-label={layer.title}
           >
             <span>{layer.label}</span>
           </a>

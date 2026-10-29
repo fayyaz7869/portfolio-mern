@@ -53,22 +53,23 @@ side by side during development with no extra config.
 
 ## Editing your content
 
-- **Resume**: replace `client/public/resume.pdf` with an updated file — the
-  "Download resume" buttons link straight to it.
-- **Photo**: swap `client/src/assets/profile.jpg` (there's also
-  `profile-alt.jpg`, your other headshot, if you want to switch the look).
-- **Projects**: edit `client/src/data/projects.js` (fallback/offline copy)
-  and `server/seed.js` (what gets loaded into MongoDB), or `POST` new
-  projects straight to `/api/projects`.
-- **Copy** (about, skills, experience): edit the matching component in
-  `client/src/components/`.
+- **Resume Preview & Download**: `client/public/resume.pdf` is embedded inside the interactive `ResumeModal` so visitors can view it immediately without downloading, and click "Download PDF" anytime to save it.
+- **Contact Form & Direct Email Delivery**:
+  - Automatically delivers client messages directly to `fayyazmansoori.dev@gmail.com` using FormSubmit with reply-to headers so you can hit Reply directly in Gmail.
+  - Concurrently saves messages to MongoDB `/api/contact` and supports Nodemailer if SMTP credentials are added to `server/.env`.
+  - The first time someone submits the form, FormSubmit sends a 1-click confirmation email to `fayyazmansoori.dev@gmail.com`. Click "Activate" once, and all future client leads land straight in your inbox!
+- **Projects**: edit `client/src/data/projects.js` and `server/seed.js`.
+- **Photo**: `client/src/assets/profile.jpg`.
 
-## Deploying
+## Deploying Updates to Render
 
-- **Frontend**: `npm run build` in `client/` produces a static `dist/`
-  folder — deploy it to Vercel, Netlify, or similar.
-- **Backend**: deploy `server/` to Render, Railway, or similar, set the
-  `MONGO_URI` and `PORT` environment variables there, and point your
-  deployed frontend's API calls at the backend's URL (update the fetch
-  calls in `Projects.jsx` and `Contact.jsx`, or add a proxy/rewrite rule
-  on your host).
+If your portfolio is hosted on Render:
+1. Push your updated code to your GitHub repository:
+   ```bash
+   git add .
+   git commit -m "Revamp portfolio: theme, contact form email delivery, resume viewer"
+   git push origin main
+   ```
+2. Render will automatically detect the changes and redeploy!
+   - Build Command: `npm install && npm run build` (inside `client`)
+   - Publish Directory: `client/dist` (or `dist` depending on your Render root setting)
