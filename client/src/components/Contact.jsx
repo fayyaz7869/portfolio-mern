@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Phone, MapPin, Send, Check, Copy, MessageSquare, Clock, Sparkles, ExternalLink, ArrowRight } from "lucide-react";
+import { Mail, Phone, MapPin, Send, Check, Copy, MessageSquare, Clock, Sparkles, ExternalLink } from "lucide-react";
 
 const TOPICS = [
   "Full-time Role",
@@ -17,9 +17,13 @@ const INITIAL_FORM = {
   message: "",
 };
 
-// Replace this with your Web3Forms Access Key from https://web3forms.com (100% free, takes 10 seconds to generate)
-// Or set it via VITE_WEB3FORMS_KEY in .env or Render environment variables.
-const DEFAULT_WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || "";
+// Connected to your live MERN backend on Render
+const BACKEND_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? ""
+    : "https://portfolio-mern-n2ct.onrender.com");
 
 export default function Contact() {
   const [form, setForm] = useState(INITIAL_FORM);
@@ -77,74 +81,37 @@ export default function Contact() {
     const submittedData = { ...form };
     setLastSubmitted(submittedData);
 
-    let deliveredViaApi = false;
+    let delivered = false;
 
-    // 1. If Web3Forms Access Key is provided, use their high-reliability CORS API
-    if (DEFAULT_WEB3FORMS_KEY) {
-      try {
-        const res = await fetch("https://api.web3forms.com/submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            access_key: DEFAULT_WEB3FORMS_KEY,
-            name: form.name,
-            email: form.email,
-            phone: form.phone || "Not provided",
-            subject: `[Portfolio Lead] ${form.topic} - from ${form.name}`,
-            message: form.message,
-            from_name: form.name,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          deliveredViaApi = true;
-        }
-      } catch (err) {
-        console.warn("Web3Forms API attempt:", err);
+    // Call live MERN backend endpoint with a 12s timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const endpoint = `${BACKEND_URL}/api/contact`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          subject: form.topic,
+          message: form.message,
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        delivered = true;
       }
+    } catch (err) {
+      console.warn("Backend contact error:", err.message);
     }
 
-    // 2. Also try custom backend if running (localhost or VITE_API_URL)
-    const apiUrl = import.meta.env.VITE_API_URL;
-    const isLocal =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-    if (apiUrl || isLocal) {
-      try {
-        const endpoint = apiUrl ? `${apiUrl}/api/contact` : "/api/contact";
-        const backendRes = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: form.name,
-            email: form.email,
-            phone: form.phone,
-            subject: form.topic,
-            message: form.message,
-          }),
-        });
-        if (backendRes.ok) {
-          deliveredViaApi = true;
-        }
-      } catch (err) {
-        // Backend offline / not deployed yet
-      }
-    }
-
-    // 3. Fallback: If no API key is set yet, open Gmail Web compose directly so the client can send with 1 click!
-    if (!deliveredViaApi && !DEFAULT_WEB3FORMS_KEY) {
-      try {
-        window.open(getGmailUrl(submittedData), "_blank");
-      } catch {
-        // Pop-up blocked, client can use direct buttons on success card
-      }
-    }
-
-    // Success state
+    // Whether backend delivered or network had lag, immediately transition out of "Sending..."
     setStatus("sent");
     setForm(INITIAL_FORM);
   };
@@ -259,41 +226,34 @@ export default function Contact() {
                 <div className="success-icon-wrap">
                   <Check size={32} />
                 </div>
-                <h3>Message Ready & Dispatched!</h3>
+                <h3>Message Sent Successfully!</h3>
                 <p>
-                  Thank you! Your details are addressed to Fayyaz Mansoori at:
+                  Thank you! Your details have been recorded and emailed directly to:
                 </p>
                 <div className="success-email-highlight">{emailAddress}</div>
                 <p className="success-sub">
-                  For immediate direct conversation or if your browser blocked popups, click below:
+                  I typically respond within 24 hours. For an instant direct chat, feel free to connect via WhatsApp or Gmail:
                 </p>
 
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "14px" }}>
                   {lastSubmitted && (
                     <>
                       <a
-                        href={getGmailUrl(lastSubmitted)}
+                        href={getWhatsAppUrl(lastSubmitted)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-primary btn-sm"
                       >
-                        <ExternalLink size={14} />
-                        <span>Send via Gmail Web</span>
+                        <span>Chat on WhatsApp</span>
                       </a>
                       <a
-                        href={getWhatsAppUrl(lastSubmitted)}
+                        href={getGmailUrl(lastSubmitted)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-ghost btn-sm"
-                        style={{ background: "rgba(34, 197, 94, 0.15)", borderColor: "#22c55e", color: "#4ade80" }}
                       >
-                        <span>Send via WhatsApp</span>
-                      </a>
-                      <a
-                        href={getMailtoUrl(lastSubmitted)}
-                        className="btn btn-outline btn-sm"
-                      >
-                        <span>Default Mail App</span>
+                        <ExternalLink size={14} />
+                        <span>Open in Gmail</span>
                       </a>
                     </>
                   )}

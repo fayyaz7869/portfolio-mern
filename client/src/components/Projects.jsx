@@ -10,23 +10,19 @@ const FILTER_TABS = [
   { id: "java", label: "Core Java" },
 ];
 
+const BACKEND_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? ""
+    : "https://portfolio-mern-n2ct.onrender.com");
+
 export default function Projects() {
   const [projects, setProjects] = useState(fallbackProjects);
   const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL;
-    const isLocal =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-    // On static deployments (e.g. Render static site) without a separate backend URL,
-    // don't fire a doomed /api/projects request that prints 404 in console.
-    if (!apiUrl && !isLocal) {
-      return;
-    }
-
-    const endpoint = apiUrl ? `${apiUrl}/api/projects` : "/api/projects";
+    const endpoint = `${BACKEND_URL}/api/projects`;
     fetch(endpoint)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
