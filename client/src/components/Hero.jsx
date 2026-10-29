@@ -5,10 +5,13 @@ import { FileText, Download, ArrowRight, Terminal as TerminalIcon, Sparkles } fr
 const CODE_LINES = [
   'const dev = {',
   '  name: "Fayyaz Mansoori",',
-  '  role: "MERN Stack Developer",',
-  '  skills: ["React", "Node.js", "Express", "MongoDB", "Core Java"],',
-  '  location: "Indore, MP, India",',
-  '  status: "Open to Software Engineer roles"',
+  '  role: "MERN Developer",',
+  '  skills: [',
+  '    "React", "Node.js",',
+  '    "Express", "MongoDB"',
+  '  ],',
+  '  city: "Indore, India",',
+  '  status: "Open to work"',
   '};',
 ];
 
